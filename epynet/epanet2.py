@@ -973,6 +973,16 @@ class EPANET2(object):
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
 
+    def ENsetpipedata(self,index,length,diam,rough):
+
+        ierr = self._lib.EN_setpipedata(self.ph, ctypes.c_int(index),
+                                         ctypes.c_float(length),
+                                         ctypes.c_float(diam),
+                                         ctypes.c_float(rough),
+                                         0)
+        if ierr != 0:
+            raise ENtoolkitError(self, ierr)
+
     # Time Pattern Functions.
 
     def ENdeletepattern(self, index):

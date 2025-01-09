@@ -169,9 +169,9 @@ class EpanetOutBin(object):
     example code:
     # import EpanetOutBin
     # with EpanetOutBin("Net1.bin") as a:
-    ...    print a.nodes.keys()
-    ...    print a.nodes['10'].demand
-    ...    print a.flowunits
+    ...    print(a.nodes.keys())
+    ...    print(a.nodes['10'].demand)
+    ...    print(a.flowunits)
     ...
     [u'11', u'10', u'13', u'12', u'21', u'22', u'23', u'32', u'31', u'2', u'9']
     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -208,7 +208,7 @@ class EpanetOutBin(object):
         Tstatflag = Prolog[11]
         Rstart = Prolog[12]
         Rstep = Prolog[13]
-        Dur = Prolog[14]
+        Dur = Prolog[14] # Total duration
 
         f.seek(-3 * INTSIZE, SEEK_END)
         self._Nperiods, warn, magic = struct.unpack("3i", f.read(3 * INTSIZE))
@@ -304,6 +304,7 @@ class EpanetOutBin(object):
         i = struct.unpack("i", self._file.read(INTSIZE))[0]
         return _flowunits[i]
 
+
     @property
     def pressureunits(self):
         """Pressure Units """
@@ -319,6 +320,7 @@ class EpanetOutBin(object):
         self._file.seek(addr)
         i = struct.unpack("i", self._file.read(INTSIZE))[0]
         return _statistics[i]
+
 
     @property
     def title(self):

@@ -11,19 +11,6 @@ import datetime
 import os
 import warnings
 
-class Constants:
-    def __init__(self):
-        pass
-
-# Component counts
-    EN_NODECOUNT = 0
-    EN_TANKCOUNT = 1
-    EN_LINKCOUNT = 2
-    EN_PATCOUNT = 3
-    EN_CURVECOUNT = 4
-    EN_CONTROLCOUNT = 5
-    EN_RULECOUNT = 6
-
 
 class EPANET2(object):
 
@@ -131,7 +118,8 @@ class EPANET2(object):
                                        ctypes.c_char_p(nomerpt.encode()),
                                        ctypes.c_char_p(nomebin.encode()),
                                        callback)
-        if ierr != 0:
+
+        if ierr > 6:
             raise ENtoolkitError(self, ierr)
 
     def ENsaveinpfile(self, fname):
@@ -153,20 +141,11 @@ class EPANET2(object):
             raise ENtoolkitError(self, ierr)
 
     def ENinitH(self, flag=None):
-        """This function initializes storage tank levels, link status and settings, and the simulation time clock prior
+        """Initializes storage tank levels, link status and settings,
+            and the simulation clock time prior
             to running a hydraulic analysis.
 
-            The initialization flag is a two digit number where the 1st (left) digit indicates if link flows should be
-            re-initialized (1) or not (0), and the 2nd digit indicates if hydraulic results should be saved to a
-            temporary binary hydraulics file (1) or not (0).
-
-            Be sure to call EN_initH prior to running a hydraulic analysis using a EN_runH - EN_nextH loop..
-
-            EN_NOSAVE = 0
-            EN_SAVE = 1
-            EN_INITFLOW = 10
-            EN_SAVE_AND_INIT = 11
-         """
+            flag  EN_NOSAVE [+EN_SAVE] [+EN_INITFLOW] """
         ierr = self._lib.EN_initH(self.ph, flag)
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
@@ -646,6 +625,45 @@ class EPANET2(object):
             raise ENtoolkitError(self, ierr)
         return j.value
 
+    def ENgetnodevalues(self,paramcode):
+        """Retrieves the value of a specific node parameter.
+
+        Arguments:
+        index:     node index
+        paramcode: Node parameter codes consist of the following constants:
+                      EN_ELEVATION  Elevation
+                      EN_BASEDEMAND ** Base demand
+                      EN_PATTERN    ** Demand pattern index
+                      EN_EMITTER    Emitter coeff.
+                      EN_INITQUAL   Initial quality
+                      EN_SOURCEQUAL Source quality
+                      EN_SOURCEPAT  Source pattern index
+                      EN_SOURCETYPE Source type (See note below)
+                      EN_TANKLEVEL  Initial water level in tank
+                      EN_DEMAND     * Actual demand
+                      EN_HEAD       * Hydraulic head
+                      EN_PRESSURE   * Pressure
+                      EN_QUALITY    * Actual quality
+                      EN_SOURCEMASS * Mass flow rate per minute of a chemical source
+                        * computed values)
+                       ** primary demand category is last on demand list
+
+                   The following parameter codes apply only to storage tank nodes:
+                      EN_INITVOLUME  Initial water volume
+                      EN_MIXMODEL    Mixing model code (see below)
+                      EN_MIXZONEVOL  Inlet/Outlet zone volume in a 2-compartment tank
+                      EN_TANKDIAM    Tank diameter
+                      EN_MINVOLUME   Minimum water volume
+                      EN_VOLCURVE    Index of volume versus depth curve (0 if none assigned)
+                      EN_MINLEVEL    Minimum water level
+                      EN_MAXLEVEL    Maximum water level
+                      EN_MIXFRACTION Fraction of total volume occupied by the inlet/outlet zone in a 2-compartment tank
+                      EN_TANK_KBULK  Bulk reaction rate coefficient"""
+        j = ctypes.c_float()
+        ierr = self._lib.EN_getnodevalues(self.ph,paramcode, ctypes.byref(j))
+        if ierr != 0:
+            raise ENtoolkitError(self, ierr)
+        return j.value
     def ENsetcoord(self, index, x, y):
         ierr = self._lib.EN_setcoord(self.ph, ctypes.c_int(index),
                                      ctypes.c_float(x),
@@ -737,30 +755,17 @@ class EPANET2(object):
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
 
-    def ENgetdemandindex(self, index, demandname):
-
-        ierr = self._lib.EN_getdemandindex(self.ph, int(index), demandname.encode('utf-8'), ctypes.byref(ctypes.c_int()))
-
-        if ierr != 0:
-            raise ENtoolkitError(self, ierr)
-
     def ENgetbasedemand(self, index, demandindex):
         """ Gets the base demand for one of a node's demand categories.
-
-        ENgetbasedemand(index, demandindex)
-
-        Arguments:
-        index:          a node's index (starting from 1).
-        demandindex :   the index of a demand category for the node (starting from 1).
-
-        Returns:
-        value  the category's base demand.
-
-        """
-        bDem = ctypes.c_double()
-        ierr  = self._lib.EN_getbasedemand(self.ph, int(index), demandindex, ctypes.byref(bDem))
+                Arguments:
+                index: a node's index (starting from 1).
+                demandindex : the index of a demand category for the node (starting from 1).
+                """
+        label = ctypes.create_string_buffer(self._max_label_len)
+        ierr = self._lib.EN_getbasedemand(self.ph, ctypes.c_int(index), ctypes.c_int(demandindex))
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
+        return label.value.decode(self.charset)
 
     def ENgetdemandname(self, index, demandindex):
         """Retrieves the name of a node's demand category.
@@ -788,6 +793,7 @@ class EPANET2(object):
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
         return j.value
+
     def ENgetdemandmodel(self):
         """
         Retrieves the type of demand model in use and its parameters.
@@ -824,7 +830,6 @@ class EPANET2(object):
                                            ctypes.c_float(pexp))
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
-
 
     # Network Link Functions
 
@@ -880,23 +885,79 @@ class EPANET2(object):
         Arguments:
         index:     link index
         paramcode: Link parameter codes consist of the following constants:
-                     EN_DIAMETER     Diameter
-                     EN_LENGTH       Length
-                     EN_ROUGHNESS    Roughness coeff.
-                     EN_MINORLOSS    Minor loss coeff.
-                     EN_INITSTATUS   Initial link status (0 = closed, 1 = open)
-                     EN_INITSETTING  Roughness for pipes, initial speed for pumps, initial setting for valves
-                     EN_KBULK        Bulk reaction coeff.
-                     EN_KWALL        Wall reaction coeff.
-                     EN_FLOW         * Flow rate
-                     EN_VELOCITY     * Flow velocity
-                     EN_HEADLOSS     * Head loss
-                     EN_STATUS       * Actual link status (0 = closed, 1 = open)
-                     EN_SETTING      * Roughness for pipes, actual speed for pumps, actual setting for valves
-                     EN_ENERGY       * Energy expended in kwatts
+                     EN_DIAMETER        Diameter
+                     EN_LENGTH          Length
+                     EN_ROUGHNESS       Roughness coeff.
+                     EN_MINORLOSS       Minor loss coeff.
+                     EN_INITSTATUS      Initial link status (0 = closed, 1 = open)
+                     EN_INITSETTING     Roughness for pipes, initial speed for pumps, initial setting for valves
+                     EN_KBULK           Bulk reaction coeff.
+                     EN_KWALL           Wall reaction coeff.
+                     EN_FLOW            * Flow rate
+                     EN_VELOCITY        * Flow velocity
+                     EN_HEADLOSS        * Head loss
+                     EN_STATUS          * Actual link status (0 = closed, 1 = open)
+                     EN_SETTING         * Roughness for pipes, actual speed for pumps, actual setting for valves
+                     EN_ENERGY          * Energy expended in kwatts
+                     EN_LINKQUAL        * Current computed link quality (read only)
+                     EN_LINKPATTERN     Pump speed time pattern index.
+                     EN_PUMP_STATE      * Current computed pump state (read only) (see EN_PumpStateType)
+                     EN_PUMP_EFFIC      * Current computed pump efficiency (read only)
+                     EN_PUMP_POWER      Pump constant power rating.
+                     EN_PUMP_HCURVE     Pump head v. flow curve index.
+                     EN_PUMP_ECURVE     Pump efficiency v. flow curve index.
+                     EN_PUMP_ECOST      Pump average energy price.
+                     EN_PUMP_EPAT       Pump energy price time pattern index.
+                     EN_LINK_INCONTROL  Is present in any simple or rule-based control (= 1) or not (= 0)
+                     EN_GPV_CURVE       GPV head loss v. flow curve index.
+                     EN_PCV_CURVE       PCV loss coeff. curve index.
+                     EN_LEAK_AREA       Pipe leak area (sq mm per 100 length units)
+                     EN_LEAK_EXPAN      Leak expansion rate (sq mm per unit of pressure head)
+                     EN_LINK_LEAKAGE    * Current leakage rate (read only)
                        * computed values"""
         j = ctypes.c_float()
         ierr = self._lib.EN_getlinkvalue(self.ph, index, paramcode, ctypes.byref(j))
+        if ierr != 0:
+            raise ENtoolkitError(self, ierr)
+        return j.value
+
+    def ENgetlinkvalues(self, paramcode):
+        """Retrieves an array of property values for all links.
+
+        Arguments:
+        paramcode: Link parameter codes consist of the following constants:
+                     EN_DIAMETER        Diameter
+                     EN_LENGTH          Length
+                     EN_ROUGHNESS       Roughness coeff.
+                     EN_MINORLOSS       Minor loss coeff.
+                     EN_INITSTATUS      Initial link status (0 = closed, 1 = open)
+                     EN_INITSETTING     Roughness for pipes, initial speed for pumps, initial setting for valves
+                     EN_KBULK           Bulk reaction coeff.
+                     EN_KWALL           Wall reaction coeff.
+                     EN_FLOW            * Flow rate
+                     EN_VELOCITY        * Flow velocity
+                     EN_HEADLOSS        * Head loss
+                     EN_STATUS          * Actual link status (0 = closed, 1 = open)
+                     EN_SETTING         * Roughness for pipes, actual speed for pumps, actual setting for valves
+                     EN_ENERGY          * Energy expended in kwatts
+                     EN_LINKQUAL        * Current computed link quality (read only)
+                     EN_LINKPATTERN     Pump speed time pattern index.
+                     EN_PUMP_STATE      * Current computed pump state (read only) (see EN_PumpStateType)
+                     EN_PUMP_EFFIC      * Current computed pump efficiency (read only)
+                     EN_PUMP_POWER      Pump constant power rating.
+                     EN_PUMP_HCURVE     Pump head v. flow curve index.
+                     EN_PUMP_ECURVE     Pump efficiency v. flow curve index.
+                     EN_PUMP_ECOST      Pump average energy price.
+                     EN_PUMP_EPAT       Pump energy price time pattern index.
+                     EN_LINK_INCONTROL  Is present in any simple or rule-based control (= 1) or not (= 0)
+                     EN_GPV_CURVE       GPV head loss v. flow curve index.
+                     EN_PCV_CURVE       PCV loss coeff. curve index.
+                     EN_LEAK_AREA       Pipe leak area (sq mm per 100 length units)
+                     EN_LEAK_EXPAN      Leak expansion rate (sq mm per unit of pressure head)
+                     EN_LINK_LEAKAGE    * Current leakage rate (read only)
+                       * computed values"""
+        j = ctypes.c_float()
+        ierr = self._lib.EN_getlinkvalues(self.ph,paramcode, ctypes.byref(j))
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
         return j.value
@@ -966,7 +1027,8 @@ class EPANET2(object):
                        exists prior to the start of a simulation. Use EN_STATUS and EN_SETTING to change these values while
                        a simulation is being run (within the ENrunH - ENnextH loop).
 
-        value:parameter value"""
+        value:  parameter value
+        """
         ierr = self._lib.EN_setlinkvalue(self.ph, ctypes.c_int(index),
                                          ctypes.c_int(paramcode),
                                          ctypes.c_float(value))
@@ -974,6 +1036,14 @@ class EPANET2(object):
             raise ENtoolkitError(self, ierr)
 
     def ENsetpipedata(self,index,length,diam,rough):
+
+        """Sets serveral properties for a pipe link
+        Arguments:
+            index:  link index
+            length: length of pipe
+            diam: diameter of pipe
+            rough: roughness of pipe
+        """
 
         ierr = self._lib.EN_setpipedata(self.ph, ctypes.c_int(index),
                                          ctypes.c_float(length),
@@ -1198,8 +1268,8 @@ class EPANET2(object):
         xValues = Values_type()
         yValues = Values_type()
         for i in range(nValues):
-           xValues[i] = float(values[i][0])
-           yValues[i] = float(values[i][1])
+            xValues[i] = float(values[i][0])
+            yValues[i] = float(values[i][1])
 
         ierr = self._lib.EN_setcurve(self.ph, curveIndex, xValues, yValues, nValues)
 
@@ -1228,7 +1298,7 @@ class EPANET2(object):
                     y	the point's new y-value.   """
 
         ierr = self._lib.EN_setcurvevalue(self.ph, ctypes.c_int(curve_index), ctypes.c_int(point_index),
-                                              ctypes.c_float(x), ctypes.c_float(y))
+                                          ctypes.c_float(x), ctypes.c_float(y))
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
 
@@ -1561,7 +1631,7 @@ class EPANET2(object):
         object_type: object type
         index: object index
         """
-        label = ctypes.create_string_buffer(1024)
+        label = ctypes.create_string_buffer(300)
         ierr = self._lib.EN_getcomment(self.ph, object_type, index, ctypes.byref(label))
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
@@ -1756,10 +1826,10 @@ EN_LIFO = 3
 
 EN_NOSAVE = 0  # /* Save-results-to-file flag */
 EN_SAVE = 1
-EN_INITFLOW =10
+EN_INITFLOW = 10
 EN_SAVE_AND_INIT = 4
 
-EN_DDA = 0      # /* Demand model types   */
+EN_DDA = 0  # /* Demand model types   */
 EN_PDA = 1
 
 FlowUnits = {EN_CFS: "cf/s",
@@ -1813,11 +1883,6 @@ EN_EFFIC_CURVE = 2
 EN_HLOSS_CURVE = 3
 EN_GENERIC_CURVE = 4
 EN_VALVE_CURVE = 5
-
-EN_PUMP_XHEAD    = 0      # /* Pump State Type */
-EN_PUMP_CLOSED   = 1
-EN_PUMP_OPEN     = 2
-EN_PUMP_XFLOW    = 3
 
 EN_PSI = 0  # / *Pressure units. */
 EN_KPA = 1

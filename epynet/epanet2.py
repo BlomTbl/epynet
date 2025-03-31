@@ -50,7 +50,8 @@ class EPANET2(object):
 
         self._max_label_len = 32
         self._err_max_char = 80
-
+        self.TYPENODE = self.TYPENODE = ['JUNCTION', 'RESERVOIR', 'TANK']
+        self.Solve=0
     # Project Functions
 
     def ENclose(self):
@@ -118,8 +119,7 @@ class EPANET2(object):
                                        ctypes.c_char_p(nomerpt.encode()),
                                        ctypes.c_char_p(nomebin.encode()),
                                        callback)
-
-        if ierr > 6:
+        if ierr != 0:
             raise ENtoolkitError(self, ierr)
 
     def ENsaveinpfile(self, fname):
@@ -213,7 +213,7 @@ class EPANET2(object):
         The sequence EN_openH - EN_initH - EN_runH - EN_nextH - EN_closeH can be used instead to gain access to results
         at intermediate time periods and directly adjust link status and control settings as a simulation proceeds.
         """
-        ierr = self._lib.EN_solveH(self.ph, )
+        ierr = self._lib.EN_solveH(self.ph)
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
 
@@ -585,85 +585,62 @@ class EPANET2(object):
             raise ENtoolkitError(self, ierr)
         return j.value
 
+    # def ENgetnodevalue(self, index, paramcode):
+    #     """Retrieves the value of a specific node parameter.
+
+    #     Arguments:
+    #     index:     node index
+    #     paramcode: Node parameter codes consist of the following constants:
+    #                   EN_ELEVATION  Elevation
+    #                   EN_BASEDEMAND ** Base demand
+    #                   EN_PATTERN    ** Demand pattern index
+    #                   EN_EMITTER    Emitter coeff.
+    #                   EN_INITQUAL   Initial quality
+    #                   EN_SOURCEQUAL Source quality
+    #                   EN_SOURCEPAT  Source pattern index
+    #                   EN_SOURCETYPE Source type (See note below)
+    #                   EN_TANKLEVEL  Initial water level in tank
+    #                   EN_DEMAND     * Actual demand
+    #                   EN_HEAD       * Hydraulic head
+    #                   EN_PRESSURE   * Pressure
+    #                   EN_QUALITY    * Actual quality
+    #                   EN_SOURCEMASS * Mass flow rate per minute of a chemical source
+    #                     * computed values)
+    #                    ** primary demand category is last on demand list
+
+    #                The following parameter codes apply only to storage tank nodes:
+    #                   EN_INITVOLUME  Initial water volume
+    #                   EN_MIXMODEL    Mixing model code (see below)
+    #                   EN_MIXZONEVOL  Inlet/Outlet zone volume in a 2-compartment tank
+    #                   EN_TANKDIAM    Tank diameter
+    #                   EN_MINVOLUME   Minimum water volume
+    #                   EN_VOLCURVE    Index of volume versus depth curve (0 if none assigned)
+    #                   EN_MINLEVEL    Minimum water level
+    #                   EN_MAXLEVEL    Maximum water level
+    #                   EN_MIXFRACTION Fraction of total volume occupied by the inlet/outlet zone in a 2-compartment tank
+    #                   EN_TANK_KBULK  Bulk reaction rate coefficient"""
+    #     j = ctypes.c_double()
+    #     ierr = self._lib.EN_getnodevalue(self.ph, index, paramcode, ctypes.byref(j))
+    #     if ierr != 0:
+    #         raise ENtoolkitError(self, ierr)
+    #     return j.value
+
+    import ctypes
+
     def ENgetnodevalue(self, index, paramcode):
-        """Retrieves the value of a specific node parameter.
+        """Retrieves the value of a specific node parameter."""
 
-        Arguments:
-        index:     node index
-        paramcode: Node parameter codes consist of the following constants:
-                      EN_ELEVATION  Elevation
-                      EN_BASEDEMAND ** Base demand
-                      EN_PATTERN    ** Demand pattern index
-                      EN_EMITTER    Emitter coeff.
-                      EN_INITQUAL   Initial quality
-                      EN_SOURCEQUAL Source quality
-                      EN_SOURCEPAT  Source pattern index
-                      EN_SOURCETYPE Source type (See note below)
-                      EN_TANKLEVEL  Initial water level in tank
-                      EN_DEMAND     * Actual demand
-                      EN_HEAD       * Hydraulic head
-                      EN_PRESSURE   * Pressure
-                      EN_QUALITY    * Actual quality
-                      EN_SOURCEMASS * Mass flow rate per minute of a chemical source
-                        * computed values)
-                       ** primary demand category is last on demand list
+        value = ctypes.c_double()
+        ierr = self._lib.EN_getnodevalue(self.ph, int(index), paramcode, ctypes.byref(value))
 
-                   The following parameter codes apply only to storage tank nodes:
-                      EN_INITVOLUME  Initial water volume
-                      EN_MIXMODEL    Mixing model code (see below)
-                      EN_MIXZONEVOL  Inlet/Outlet zone volume in a 2-compartment tank
-                      EN_TANKDIAM    Tank diameter
-                      EN_MINVOLUME   Minimum water volume
-                      EN_VOLCURVE    Index of volume versus depth curve (0 if none assigned)
-                      EN_MINLEVEL    Minimum water level
-                      EN_MAXLEVEL    Maximum water level
-                      EN_MIXFRACTION Fraction of total volume occupied by the inlet/outlet zone in a 2-compartment tank
-                      EN_TANK_KBULK  Bulk reaction rate coefficient"""
-        j = ctypes.c_float()
-        ierr = self._lib.EN_getnodevalue(self.ph, index, paramcode, ctypes.byref(j))
-        if ierr != 0:
-            raise ENtoolkitError(self, ierr)
-        return j.value
+        if ierr == 240:
+            return None  # Return None explicitly for undefined values (error 240)
+        elif ierr != 0:
+                raise ENtoolkitError(self, ierr)  # Raise specific error for other codes
 
-    def ENgetnodevalues(self,paramcode):
-        """Retrieves the value of a specific node parameter.
+        return value.value
 
-        Arguments:
-        index:     node index
-        paramcode: Node parameter codes consist of the following constants:
-                      EN_ELEVATION  Elevation
-                      EN_BASEDEMAND ** Base demand
-                      EN_PATTERN    ** Demand pattern index
-                      EN_EMITTER    Emitter coeff.
-                      EN_INITQUAL   Initial quality
-                      EN_SOURCEQUAL Source quality
-                      EN_SOURCEPAT  Source pattern index
-                      EN_SOURCETYPE Source type (See note below)
-                      EN_TANKLEVEL  Initial water level in tank
-                      EN_DEMAND     * Actual demand
-                      EN_HEAD       * Hydraulic head
-                      EN_PRESSURE   * Pressure
-                      EN_QUALITY    * Actual quality
-                      EN_SOURCEMASS * Mass flow rate per minute of a chemical source
-                        * computed values)
-                       ** primary demand category is last on demand list
 
-                   The following parameter codes apply only to storage tank nodes:
-                      EN_INITVOLUME  Initial water volume
-                      EN_MIXMODEL    Mixing model code (see below)
-                      EN_MIXZONEVOL  Inlet/Outlet zone volume in a 2-compartment tank
-                      EN_TANKDIAM    Tank diameter
-                      EN_MINVOLUME   Minimum water volume
-                      EN_VOLCURVE    Index of volume versus depth curve (0 if none assigned)
-                      EN_MINLEVEL    Minimum water level
-                      EN_MAXLEVEL    Maximum water level
-                      EN_MIXFRACTION Fraction of total volume occupied by the inlet/outlet zone in a 2-compartment tank
-                      EN_TANK_KBULK  Bulk reaction rate coefficient"""
-        j = ctypes.c_float()
-        ierr = self._lib.EN_getnodevalues(self.ph,paramcode, ctypes.byref(j))
-        if ierr != 0:
-            raise ENtoolkitError(self, ierr)
-        return j.value
     def ENsetcoord(self, index, x, y):
         ierr = self._lib.EN_setcoord(self.ph, ctypes.c_int(index),
                                      ctypes.c_float(x),
@@ -695,7 +672,7 @@ class EPANET2(object):
                       EN_MIXFRACTION   Fraction of total volume occupied by the inlet/outlet
                       EN_TANK_KBULK    Bulk reaction rate coefficient
         value:parameter value"""
-        ierr = self._lib.EN_setnodevalue(self.ph, ctypes.c_int(index), ctypes.c_int(paramcode), ctypes.c_float(value))
+        ierr = self._lib.EN_setnodevalue(self.ph, ctypes.c_int(index), ctypes.c_int(paramcode), ctypes.c_double(value))
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
 
@@ -793,7 +770,6 @@ class EPANET2(object):
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
         return j.value
-
     def ENgetdemandmodel(self):
         """
         Retrieves the type of demand model in use and its parameters.
@@ -830,6 +806,7 @@ class EPANET2(object):
                                            ctypes.c_float(pexp))
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
+
 
     # Network Link Functions
 
@@ -868,6 +845,53 @@ class EPANET2(object):
             raise ENtoolkitError(self, ierr)
         return j1.value, j2.value
 
+    def ENgetvertex(self, index, vertex):
+        """ Retrieves the coordinate's of a vertex point assigned to a link.
+
+
+        ENgetvertex(index, vertex)
+
+        Parameters:
+        index      a link's index (starting from 1).
+        vertex     a vertex point index (starting from 1).
+
+        Returns:
+        x  the vertex's X-coordinate value.
+        y  the vertex's Y-coordinate value.
+        """
+        x = ctypes.c_double()  # need double for EN_ or EN functions.
+        y = ctypes.c_double()
+        if self.ph is not None:
+            ierr = self._lib.EN_getvertex(self.ph, int(index), vertex, ctypes.byref(x), ctypes.byref(y))
+        else:
+            ierr = self._lib.ENgetvertex(int(index), vertex, ctypes.byref(x), ctypes.byref(y))
+
+        if ierr != 0:
+            raise ENtoolkitError(self, ierr)
+        return [x.value, y.value]
+
+    def ENgetvertexcount(self, index):  
+        """ Retrieves the number of internal vertex points assigned to a link.
+
+        ENgetvertexcount(index)
+
+        Parameters:
+        index      a link's index (starting from 1).
+
+        Returns:
+        count  the number of vertex points that describe the link's shape.
+        """
+        count = ctypes.c_int()
+
+        if self.ph is not None:
+            ierr = self._lib.EN_getvertexcount(self.ph, int(index),ctypes.byref(count))
+        else:
+            ierr = self._lib.ENgetvertexcount(int(index), ctypes.byref(count))
+
+        if ierr != 0:
+            raise ENtoolkitError(self, ierr)
+        return count.value
+
     def ENgetlinktype(self, index):
         """Retrieves the link-type code for a specific link.
 
@@ -885,79 +909,23 @@ class EPANET2(object):
         Arguments:
         index:     link index
         paramcode: Link parameter codes consist of the following constants:
-                     EN_DIAMETER        Diameter
-                     EN_LENGTH          Length
-                     EN_ROUGHNESS       Roughness coeff.
-                     EN_MINORLOSS       Minor loss coeff.
-                     EN_INITSTATUS      Initial link status (0 = closed, 1 = open)
-                     EN_INITSETTING     Roughness for pipes, initial speed for pumps, initial setting for valves
-                     EN_KBULK           Bulk reaction coeff.
-                     EN_KWALL           Wall reaction coeff.
-                     EN_FLOW            * Flow rate
-                     EN_VELOCITY        * Flow velocity
-                     EN_HEADLOSS        * Head loss
-                     EN_STATUS          * Actual link status (0 = closed, 1 = open)
-                     EN_SETTING         * Roughness for pipes, actual speed for pumps, actual setting for valves
-                     EN_ENERGY          * Energy expended in kwatts
-                     EN_LINKQUAL        * Current computed link quality (read only)
-                     EN_LINKPATTERN     Pump speed time pattern index.
-                     EN_PUMP_STATE      * Current computed pump state (read only) (see EN_PumpStateType)
-                     EN_PUMP_EFFIC      * Current computed pump efficiency (read only)
-                     EN_PUMP_POWER      Pump constant power rating.
-                     EN_PUMP_HCURVE     Pump head v. flow curve index.
-                     EN_PUMP_ECURVE     Pump efficiency v. flow curve index.
-                     EN_PUMP_ECOST      Pump average energy price.
-                     EN_PUMP_EPAT       Pump energy price time pattern index.
-                     EN_LINK_INCONTROL  Is present in any simple or rule-based control (= 1) or not (= 0)
-                     EN_GPV_CURVE       GPV head loss v. flow curve index.
-                     EN_PCV_CURVE       PCV loss coeff. curve index.
-                     EN_LEAK_AREA       Pipe leak area (sq mm per 100 length units)
-                     EN_LEAK_EXPAN      Leak expansion rate (sq mm per unit of pressure head)
-                     EN_LINK_LEAKAGE    * Current leakage rate (read only)
+                     EN_DIAMETER     Diameter
+                     EN_LENGTH       Length
+                     EN_ROUGHNESS    Roughness coeff.
+                     EN_MINORLOSS    Minor loss coeff.
+                     EN_INITSTATUS   Initial link status (0 = closed, 1 = open)
+                     EN_INITSETTING  Roughness for pipes, initial speed for pumps, initial setting for valves
+                     EN_KBULK        Bulk reaction coeff.
+                     EN_KWALL        Wall reaction coeff.
+                     EN_FLOW         * Flow rate
+                     EN_VELOCITY     * Flow velocity
+                     EN_HEADLOSS     * Head loss
+                     EN_STATUS       * Actual link status (0 = closed, 1 = open)
+                     EN_SETTING      * Roughness for pipes, actual speed for pumps, actual setting for valves
+                     EN_ENERGY       * Energy expended in kwatts
                        * computed values"""
         j = ctypes.c_float()
         ierr = self._lib.EN_getlinkvalue(self.ph, index, paramcode, ctypes.byref(j))
-        if ierr != 0:
-            raise ENtoolkitError(self, ierr)
-        return j.value
-
-    def ENgetlinkvalues(self, paramcode):
-        """Retrieves an array of property values for all links.
-
-        Arguments:
-        paramcode: Link parameter codes consist of the following constants:
-                     EN_DIAMETER        Diameter
-                     EN_LENGTH          Length
-                     EN_ROUGHNESS       Roughness coeff.
-                     EN_MINORLOSS       Minor loss coeff.
-                     EN_INITSTATUS      Initial link status (0 = closed, 1 = open)
-                     EN_INITSETTING     Roughness for pipes, initial speed for pumps, initial setting for valves
-                     EN_KBULK           Bulk reaction coeff.
-                     EN_KWALL           Wall reaction coeff.
-                     EN_FLOW            * Flow rate
-                     EN_VELOCITY        * Flow velocity
-                     EN_HEADLOSS        * Head loss
-                     EN_STATUS          * Actual link status (0 = closed, 1 = open)
-                     EN_SETTING         * Roughness for pipes, actual speed for pumps, actual setting for valves
-                     EN_ENERGY          * Energy expended in kwatts
-                     EN_LINKQUAL        * Current computed link quality (read only)
-                     EN_LINKPATTERN     Pump speed time pattern index.
-                     EN_PUMP_STATE      * Current computed pump state (read only) (see EN_PumpStateType)
-                     EN_PUMP_EFFIC      * Current computed pump efficiency (read only)
-                     EN_PUMP_POWER      Pump constant power rating.
-                     EN_PUMP_HCURVE     Pump head v. flow curve index.
-                     EN_PUMP_ECURVE     Pump efficiency v. flow curve index.
-                     EN_PUMP_ECOST      Pump average energy price.
-                     EN_PUMP_EPAT       Pump energy price time pattern index.
-                     EN_LINK_INCONTROL  Is present in any simple or rule-based control (= 1) or not (= 0)
-                     EN_GPV_CURVE       GPV head loss v. flow curve index.
-                     EN_PCV_CURVE       PCV loss coeff. curve index.
-                     EN_LEAK_AREA       Pipe leak area (sq mm per 100 length units)
-                     EN_LEAK_EXPAN      Leak expansion rate (sq mm per unit of pressure head)
-                     EN_LINK_LEAKAGE    * Current leakage rate (read only)
-                       * computed values"""
-        j = ctypes.c_float()
-        ierr = self._lib.EN_getlinkvalues(self.ph,paramcode, ctypes.byref(j))
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
         return j.value
@@ -1027,31 +995,38 @@ class EPANET2(object):
                        exists prior to the start of a simulation. Use EN_STATUS and EN_SETTING to change these values while
                        a simulation is being run (within the ENrunH - ENnextH loop).
 
-        value:  parameter value
-        """
+        value:parameter value"""
         ierr = self._lib.EN_setlinkvalue(self.ph, ctypes.c_int(index),
                                          ctypes.c_int(paramcode),
                                          ctypes.c_float(value))
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
 
-    def ENsetpipedata(self,index,length,diam,rough):
 
-        """Sets serveral properties for a pipe link
-        Arguments:
-            index:  link index
-            length: length of pipe
-            diam: diameter of pipe
-            rough: roughness of pipe
+    def ENsetvertices(self, index, x, y, vertex):
+        """ Assigns a set of internal vertex points to a link.
+
+
+        ENsetvertices(index, x, y, vertex)
+
+        Parameters:
+        index      a link's index (starting from 1).
+        x          an array of X-coordinates for the vertex points.
+        y          an array of Y-coordinates for the vertex points.
+        vertex     the number of vertex points being assigned.
         """
 
-        ierr = self._lib.EN_setpipedata(self.ph, ctypes.c_int(index),
-                                         ctypes.c_float(length),
-                                         ctypes.c_float(diam),
-                                         ctypes.c_float(rough),
-                                         0)
+        if self.ph is not None:
+            ierr = self._lib.EN_setvertices(self.ph, int(index), (ctypes.c_double * vertex)(*x),
+                                                    (ctypes.c_double * vertex)(*y), vertex)
+
+        else:
+            ierr = self._lib.ENsetvertices(int(index), (ctypes.c_double * vertex)(*x),
+                                                   (ctypes.c_double * vertex)(*y), vertex)
+
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
+    
 
     # Time Pattern Functions.
 
@@ -1631,7 +1606,7 @@ class EPANET2(object):
         object_type: object type
         index: object index
         """
-        label = ctypes.create_string_buffer(300)
+        label = ctypes.create_string_buffer(1024)
         ierr = self._lib.EN_getcomment(self.ph, object_type, index, ctypes.byref(label))
         if ierr != 0:
             raise ENtoolkitError(self, ierr)
@@ -1826,10 +1801,10 @@ EN_LIFO = 3
 
 EN_NOSAVE = 0  # /* Save-results-to-file flag */
 EN_SAVE = 1
-EN_INITFLOW = 10
+EN_INITFLOW =10
 EN_SAVE_AND_INIT = 4
 
-EN_DDA = 0  # /* Demand model types   */
+EN_DDA = 0      # /* Demand model types   */
 EN_PDA = 1
 
 FlowUnits = {EN_CFS: "cf/s",
